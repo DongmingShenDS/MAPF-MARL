@@ -1,0 +1,24 @@
+env: mapf_gridworld
+
+env_args:
+  grid_file_path: '/home/ubuntu/DongmingShen/marl_SK/src/mapf_baseline/mapf-map/empty-8-8.map'
+  agents_path: '/home/ubuntu/DongmingShen/marl_SK/src/mapf_baseline/scen-random/empty-8-8-random-'
+  n_agents: 5
+  episode_limit: 2000
+  seed: None
+  render: 'human' 
+  step_reward: -0.01
+  collide_reward: -10
+  debug: False
+
+learner_log_interval: 10000
+log_interval: 10000
+runner_log_interval: 10000
+t_max: 2000000
+test_interval: 10000
+test_nepisode: 300
+test_greedy: True
+save_model: True
+use_tensorboard: True
+save_buffer: False
+save_model_interval: 200000

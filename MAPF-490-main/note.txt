@@ -1,0 +1,17 @@
+
+1. Visulization
+    - source activate pytorch
+    - At MAPF-490/vis_export dir, "conda activate vis"
+    - "python3 src/visualizer_server.py"
+    - http://localhost:8081
+2. Run Main
+    - At MAPF-490 dir, "make"
+    - "./main"
+
+NOTE: 
+main.py
+maps/ to maps{size}/ in Town.cpp
+int town_number=9; to 49; in main.cpp
+empty-32-32 to empty-128-128 in main.cpp
+this->col_dim=32; to this->col_dim=128; in Global.cpp
+vis_export/ to vis_export{size}/ in Global.cpp

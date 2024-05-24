@@ -1,0 +1,13 @@
+{
+  "obstacle"     : "@",
+  "outlet"       : "NEWS",
+  "buffer"       : "news",
+  "idoutlet"     : "urld",
+  "partition"    : ",':;~*^-_0123456789abcfghjmpqtvxyzABCDFGHIJKLMOPQRTUVXYZ{}[]()!@#$%&=+<>αβΓγΔδεζηΘθικΛλμνΞξΠπρΣσςτυΦφχΨψΩω",
+  "buffer_end"   : "!",
+  "free_space"   : ".",
+  "unassigned"   : "x",
+  "unannotated"  : "`",
+  "idle"         : "i",
+  "congested"    : "k"
+}

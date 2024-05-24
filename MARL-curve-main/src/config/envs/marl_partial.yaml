@@ -1,0 +1,35 @@
+env: marl_partial
+
+env_args:
+  grid_file_path: '/home/ubuntu/DongmingShen/MARL_curve/src/mapf_baseline/mapf-map/empty-8-8.map'
+  agents_path: '/home/ubuntu/DongmingShen/MARL_curve/src/mapf_baseline/scen-random/empty-8-8-random-'
+  n_agents: 15
+  obs_window: 5
+  obs_knn_agents: 5
+  episode_limit: 100
+  seed: None
+  render: 'human'
+  move_reward: 0
+  stay_reward: -0.1
+  stay_goal_reward: 1
+  node_collide_reward: -2000
+  edge_collide_reward: -2000
+  env_collide_reward: -2000
+  complete_reward: 1000
+  complete_fac: 1.5
+  debug: False
+  visual: False
+  gamma: 0.99
+  output: False
+
+learner_log_interval: 20000
+log_interval: 20000
+runner_log_interval: 20000
+t_max: 50000000
+test_interval: 20000
+test_nepisode: 500
+test_greedy: True
+save_model: True
+use_tensorboard: True
+save_buffer: False
+save_model_interval: 100000

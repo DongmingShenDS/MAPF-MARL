@@ -1,0 +1,10 @@
+{
+  "vtypes"                 : "config/vtypes.json",
+  "vis_agents"             : "tmp/vis_agents.json",
+  "vis_html"               : "visualizer/static/vis.html",
+  "vis_g_map"              : "tmp/vis_gmap.json",
+  "vis_after_init"         : true,
+  "vis_json_indent"        : 0,
+  "vis_agents_lock"        : "tmp/vis_agents_lock.lock",
+  "vis_lock_timeout"       : 2
+}

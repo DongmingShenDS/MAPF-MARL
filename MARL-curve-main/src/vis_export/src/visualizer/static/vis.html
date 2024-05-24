@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+      <meta charset="utf-8"/>
+        <title>Multirobot Simulator</title>
+        <style>
+
+          body {
+            background: white;
+          }
+
+          h1 {
+            text-align: center;
+            font-family: baskerville;
+            color: #323232;
+            font-weight:normal;
+            font-size:40px;
+          }
+
+          #simulator_title {         
+            text-align: center;
+            font-family: helvetica;
+            color: #323232;
+            font-weight:normal;
+            font-size:70px;
+          }
+
+          #stat_para {         
+            text-align: center;
+            font-family: helvetica;
+            color: #323232;
+            font-weight:normal;
+            font-size:45px;
+          }
+
+          #sim_table{
+            margin-left: auto;
+            margin-right: auto;
+            width: 10%;
+            border: 1px solid black;
+            border-collapse:collapse;
+            table-layout: fixed;
+          }
+
+          .width-variable {
+            border: 1px solid white;
+            border-right: 1px solid white;
+            overflow: hidden;
+            width: auto;
+            background: white;  
+            white-space: nowrap;
+          }
+
+          .width-fixed {
+            border: 1px solid #323232;
+            overflow: hidden;
+            width: 40px;
+            height: 40px;
+            background: white;
+            font-family: helvetica;
+            font-weight: bold;
+            font-size:24px;
+            color: black;
+          }
+
+          .margin-bottom {
+            border: 1px solid white;
+            text-align: center;
+            background: white;
+            font-weight: normal;
+          }
+
+          .margin-left {
+            border: 1px solid white;
+            border-right: 1px solid #323232;
+            text-align: center;
+            background: white;
+            font-weight: normal;
+          }
+
+          .grid-cell {
+            text-align: center;
+          }
+
+          .origin-cell-variable {
+            border: 1px solid white;
+            border-right: 1px solid white;
+          }
+
+          .origin-cell-fixed {
+            border: 1px solid white;
+            border-bottom: 1px solid white;
+          }
+        </style>
+    </head>
+
+    <body>
+      <div>
+      <p id = "simulator_title">Multirobot Simulator</p>
+      <table id = "sim_table"></table>
+      <p id = "stat_para"></p>
+      </div>
+      
+    </body>
+
+    <script type = "text/javascript">
+
+      // Builds basic table
+      function build_table(nrows, ncols){
+        
+        // Table to visualize workspace with
+        var table = document.getElementById("sim_table");
+        delete_children(table.innerHTML);
+
+        // 2D array to access and modify table cells
+        var cells = new Array(nrows);
+
+        for (var rr=0; rr<nrows+1; rr++) {
+          // if (rr == 0) { // do something?
+          // }
+          var x=table.insertRow(rr);
+
+          // Add buffer cell to keep remaining cells fixed width
+          var y = x.insertCell(0);
+          y.classList.add('width-variable');
+
+          // If regular row 
+          if (rr < nrows) {
+
+            // Add array to store row's grid cells
+            cells[nrows-rr-1] = new Array(ncols);
+
+            // Add regular grid cells
+            for(var cc=1; cc<ncols+1; cc++) {
+              var y = x.insertCell(cc);
+              y.classList.add('width-fixed');
+              y.classList.add('grid-cell');
+              cells[nrows-rr-1][cc-1] = y;
+              // y.id = coords_to_coordstr(cc-1, nrows-r-1);
+              // y.innerHTML = coords_to_coordstr(c-1, nrows-r-1);
+            }
+
+            // Add margin cell (to contain x-axis value)
+            var y = x.insertCell(1);
+            y.classList.add('width-fixed');
+            y.classList.add('margin-left');
+            y.innerHTML = nrows-rr-1;
+
+          // If x-axis margin row (contains x-axis values)
+          } else {
+
+            // Black out right hand border from buffer cell
+            y.classList.add('origin-cell-variable');
+
+            // Add margin cell (to contain y-axis value)
+            for(var cc=1; cc<ncols+1; cc++) {
+              var y = x.insertCell(cc);
+              y.classList.add('width-fixed');
+              y.classList.add('margin-bottom')
+              y.innerHTML = (cc-1);
+            }
+
+            // Add origin cell
+            var y = x.insertCell(1);
+            y.classList.add('width-fixed');
+            y.classList.add('origin-cell-fixed');
+            y.innerHTML = "";
+          }
+        } // for var r=0...
+
+        return cells
+
+      } // end build_table
+
+
+      // Removes all children from node in DOM
+      function delete_children(element) {
+        while (element.firstChild) {
+          element.removeChild(element.lastChild);
+        }
+      }
+
+      // Build a cmap which maps each partition's cell type the color of the partition when 
+      // occupied.
+      function build_cell_type_to_occupied_color(cell_type_to_color) {
+
+        cell_type_to_occupied_color = new Map()
+        let ctx = document.createElement('canvas').getContext('2d');
+
+        for (const [cell_type, color] of cell_type_to_color.entries()) {
+          cell_type_to_occupied_color.set(cell_type, gen_occupied_color(color, ctx));
+        }
+
+      }
+
+
+      // Generates an occupied color for a partition with color hex_c by lightening or 
+      // darkening it depending on that partition's luma.
+      function gen_occupied_color(color, ctx) {
+        ctx.fillStyle = color;
+        let hex_c = ctx.fillStyle.slice(1);        // Remove' # from color
+        let c_num = parseInt(hex_c, 16);           // Convert hex color to number
+        let r = (c_num >> 16);                     // Extract r b g values, darken by x
+        let b = ((c_num >> 8) & 0x00FF);
+        let g = (c_num & 0x0000FF);
+
+        let luma = 0.3126 * r + 0.7152 * g + 0.0122 * b;
+        let color_multiplier = 1;
+
+        if (luma < 30) {
+          color_multiplier = 10;
+        } else if (luma < 70) {
+          color_multiplier = 2.5;
+        } else if (luma < 150) {
+          color_multiplier = 1.7
+        } else {
+          color_multiplier = 0.7;
+        }
+
+        let new_r = r * color_multiplier > 255 ? 255 : r * color_multiplier;
+        let new_b = b * color_multiplier > 255 ? 255 : b * color_multiplier;
+        let new_g = g * color_multiplier > 255 ? 255 : g * color_multiplier;
+
+        new_r     = new_r < 100 ? 100 : new_r;
+        new_g     = new_g < 100 ? 100 : new_g;
+        new_b     = new_b < 70  ? 70 : new_b;
+
+
+
+        let new_hex_c = rgbToHex(new_r | 0, new_b | 0, new_g | 0);
+
+        // console.log(color, luma, r,b,g, hex_c, "->", new_r, new_b, new_g, new_hex_c);
+
+        return new_hex_c;
+      }
+
+
+      function componentToHex(c) {
+        let hex = c.toString(16);
+        return hex.length == 1 ? "0" + hex : hex;
+      }
+
+
+      function rgbToHex(r, g, b) {
+        return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+      }
+
+
+      function update_display(g_map, annotation, cells, vis_state) {
+        draw_map(g_map, annotation, cells);
+
+        // draw_cell_to_agent_property(cells, vis_state.lgoal,  "#f7d320"); // Bright Gold, local goal?
+        // draw_cell_to_agent_property(cells, vis_state.W,      "#2af72a"); // Light Green => ??? DS
+        // draw_cell_to_agent_property(cells, vis_state.ggoal,  "#ebd7a0"); // Gold, global goal?
+        draw_cell_to_agent_property_goal(cells, vis_state.ggoal,  "#F5FFFA");           // DS: draw goals
+        draw_cell_to_agent_property_normal(cells, vis_state.v,  "#FFFF00");             // DS: draw agent
+        draw_cell_to_agent_property_collision(cells, vis_state.collision,  "#FF0000");  // DS: collision
+
+        // color_cells_with_property(cells, vis_state.pivots, "#fcf6bd"); // Light Gold => ??? DS
+        // mark_cells_with_property(cells, vis_state.iv_to_a_id, "#1E90FF"); // Deep Blue => ??? DS
+        // draw_agents(cells, vis_state);
+        // draw_paths(cells, vis_state.wplan, "black");
+      }
+
+      function display_heatmap(g_map, annotation, cells, response) {
+        draw_map(g_map, annotation, cells);
+        console.log("resp", response["v_to_heat"], response.v_to_heat)
+        color_heatmap(cells, response.v_to_heat);
+      }
+      
+      // Draws the value of each cell onto the map
+      function draw_map(g_map, annotation, cells) {
+        
+        // Cell color scheme
+        empty_cell_color = "#FFFFFF";
+        unassigned_color = "#grey";
+        obstacle_color   = "#c29a97";
+        buffer_color     = "#decceb";
+        idle_color       = "#E0FFFF"
+
+        let cell_type    = null;       // The type of the current cell
+        let cell         = null;       // The current cell
+
+        // Row 0 is stored at the bottom of the warehouse map, row w.h-1 at the top.
+        for (let rr = 0; rr < cells.length; rr++) {
+          for (let cc = 0; cc < cells[rr].length; cc++) {
+
+            cell_type       = g_map[cells.length-rr-1][cc];
+            cell_annotation = annotation[cells.length-rr-1][cc];
+            cell            = cells[rr][cc];
+            delete_children(cell);
+
+            switch (cell_type) {
+
+              // A obstacle, "@", is light red
+              case "@":
+                cell.style.backgroundColor = obstacle_color;
+                break;
+
+              // A buffer cell, "n/e/w/s", contains a downwards
+              // upwards/leftwards/rightwards arrow and is purple.
+              // case "n":
+              // case "e":
+              // case "w":
+              // case "s":
+              //   cell.style.backgroundColor = buffer_color;
+              //   add_text(cell, direction_to_arrow.get(cell_type));
+              //   break;
+
+              // A idle cell, "i", is light turquoise
+              case "i":
+                cell.style.backgroundColor = idle_color;
+                break;
+
+              // A buffer end cell, "!", contains an exclam and is purple.
+              case "!":
+                cell.style.backgroundColor = buffer_color;
+                add_text(cell, cell_type);
+                break;
+
+              // A unassigned cell, "x", is grey
+              case "x":
+                cell.style.backgroundColor = unassigned_color;
+                break;
+
+              default:
+
+                // If cell is a shard's free space cell, set its color to
+                // that shard's empty free space cell color.
+                if (cell_type_to_color.has(cell_type) ) {
+                  cell.style.backgroundColor = cell_type_to_color.get(cell_type);
+                
+                // Otherwise, cell type is unknown. Set its background color
+                // to white, and label it with its column number.
+                } else {
+                  cell.style.backgroundColor = empty_cell_color;
+                  add_text(cell, cc);
+                }
+
+            } // Switch statement
+
+
+            switch (cell_annotation) {
+
+              // Highway, add an arrow pointing in the direction of the outlet.
+              case "n":
+              case "e":
+              case "w":
+              case "s":
+                add_text(cell, direction_to_arrow.get(cell_annotation));
+                break;
+
+              // lock and intersection
+              case "I":
+              case "L":
+                add_text(cell, cell_annotation);
+                break;
+
+              // If a cell has no annotation, do not annotate it.
+              case "`":
+                break;
+
+              // Otherwise, annotate cell with ? to show that its annotation is not recognized.
+              default:
+                add_text(cell, "?");
+                break;
+            }
+
+
+          } // For each column in a row in the warehouse map
+        } // For each row in the warehouse map
+      } // function
+
+
+      // Adds text to a cell
+      function add_text(cell, text) {
+        cell.appendChild(document.createTextNode(text));
+      }
+
+
+      // Draws a property which associates cells with agents
+      function draw_cell_to_agent_property(cells, cell_to_agent, goal_color) {
+        if (cell_to_agent == null) {return} // Exit if the property is null in the current response
+
+        let cc = null, rr = null, cell = null;
+
+        for (const [v, a_ids] of Object.entries(cell_to_agent)){
+
+          [cc, rr] = conv_v(v);
+          cell    = cells[rr][cc];
+
+          delete_children(cell);
+
+          add_text(cell, a_ids.toString());
+          cells[rr][cc].style.backgroundColor = goal_color;
+        } 
+      }
+      // DS: normal (for current agent location)
+      function draw_cell_to_agent_property_normal(cells, cell_to_agent, goal_color) {
+        if (cell_to_agent == null) {return} // Exit if the property is null in the current response
+
+        let cc = null, rr = null, cell = null;
+
+        for (const [v, a_ids] of Object.entries(cell_to_agent)){
+
+          [cc, rr] = conv_v(v);
+          cell    = cells[rr][cc];
+
+          delete_children(cell);
+
+          add_text(cell, a_ids.toString());
+          cells[rr][cc].style.backgroundColor = goal_color;
+        }
+      }
+      // DS: global goal
+      function draw_cell_to_agent_property_goal(cells, cell_to_agent, goal_color) {
+        if (cell_to_agent == null) {return} // Exit if the property is null in the current response
+
+        let cc = null, rr = null, cell = null;
+
+        for (const [v, a_ids] of Object.entries(cell_to_agent)){
+
+          [cc, rr] = conv_v(v);
+          cell    = cells[rr][cc];
+
+          delete_children(cell);
+
+          add_text(cell, '.' + a_ids.toString());
+          cells[rr][cc].style.backgroundColor = goal_color;
+        }
+      }
+      // DS: collision
+      function draw_cell_to_agent_property_collision(cells, cell_to_agent, col_color) {
+        if (cell_to_agent == null) {return} // Exit if the property is null in the current response
+
+        let cc = null, rr = null, cell = null;
+
+        for (const [v, a_ids] of Object.entries(cell_to_agent)){
+
+          [cc, rr] = conv_v(v);
+          cell    = cells[rr][cc];
+
+          delete_children(cell);
+
+          add_text(cell, a_ids.toString());
+          cells[rr][cc].style.backgroundColor = col_color;
+        }
+      }
+
+      // Color cells with a given property
+      function color_cells_with_property(cells, target_cells, goal_color) {
+        if (target_cells == null) {return} // Exit if the property is null in the current response
+
+        let cc = null, rr = null;
+
+        for (const v of target_cells) {
+          [cc, rr] = conv_v(v);
+          cells[rr][cc].style.backgroundColor = goal_color;
+
+        }
+      }
+
+
+      // Mark cells with a given property
+      function mark_cells_with_property(cells, cell_to_mark, mark_color) {
+        if (cell_to_mark == null) {return} // Exit if the property is null in the current response
+
+        let cc = null, rr = null;
+
+        for (const [v, mark] of Object.entries(cell_to_mark)) {
+          [cc, rr] = conv_v(v);
+          console.log([cc, rr], mark)
+          cells[rr][cc].style.color = mark_color;
+          add_text(cells[rr][cc], mark);
+        }
+      }
+
+
+       // Draws agent path on the map
+      function draw_paths(cells, agent_to_path, path_color) {
+        if (agent_to_path == null) {return}
+
+        for (const [agent_id, path] of Object.entries(agent_to_path)){
+          if (path != null && path.length > 0) { // If agent has a path
+
+            //console.log("Drawing path", a_id, path)
+
+            var span      = null;
+            var subscript = null;
+            var cell      = null;
+
+            for (const [cc, rr] of path) {
+              cell      = cells[rr][cc];
+              span      = document.createElement('span');
+              cell.appendChild(span);
+
+              subscript = document.createElement('sub');
+              span.appendChild(subscript);
+              add_text(subscript, agent_id);
+
+              span.style.color = path_color;
+
+            } // For each loc in path
+          } // If path != null
+        } // For each agent_id, path in vis_agents.paths
+      } //function
+
+
+      // Converts location coordinates "x,y" into an array of 2 int
+      function conv_v(v_str) {
+        tokens = v_str.split(',');
+        return [parseInt(tokens[0]), parseInt(tokens[1])];
+      }
+
+
+      // Draws each agent on the map
+      function draw_agents(cells, vis_state) {
+        // Each cell containing agents is lists the agents it contains.
+        // A cell containing a collided agent (collided agents) is red.
+        // A cell continaing a uncollided agent is colored based on the shard it is in.
+        collided_agent_color = "#ea6553";
+        buffer_agent_color   = "#bcbcbc";
+
+        let cc = null, rr = null;
+
+        // For each cell with agents in it
+        for (const [v, agent_ids] of Object.entries(vis_state.v)) {
+
+          [cc, rr] = conv_v(v);
+
+          delete_children(cells[rr][cc]);
+
+          // Set the cell's text to a list of the agents it contains
+          add_text(cells[rr][cc], agent_ids.toString());
+
+          // Set the cell's color to red if it contains a collided agent
+          // and to the color associated with the agent's partition otherwise.
+          let cell_type = vis_state.p_vtype[agent_ids[0]];
+
+          if (vis_state.col_v.includes(v)) {
+            cells[rr][cc].style.backgroundColor = collided_agent_color;
+          } else {
+            cells[rr][cc].style.backgroundColor = cell_type_to_occupied_color.get(cell_type);
+            // cells[rr][cc].style.backgroundColor = buffer_agent_color;
+          }
+        } 
+      } 
+
+
+      // Color heatmap
+      function color_heatmap(cells, v_to_heat) {
+        if (v_to_heat == null) {return} // Exit if the property is null in the current response
+
+        let cc = null, rr = null;
+
+
+        for (const [v, heat] of Object.entries(v_to_heat)) {
+          [cc, rr] = conv_v(v);
+          cells[rr][cc].style.backgroundColor = get_heatmap_color(heat);
+
+        }
+      }
+
+
+      function get_heatmap_color(heat) {
+        return heatmap_colors.get(heat) || "#A4ADB4";
+      }
+
+
+      // Map directions (n, e, w, s) to arrows
+      const direction_to_arrow = new Map([['n', '\u2191'], ['N', '\u2191'], ['u', '\u2191'],
+                                          ['e', '\u2192'], ['E', '\u2192'], ['r', '\u2192'],
+                                          ['w', '\u2190'], ['W', '\u2190'], ['l', '\u2190'],
+                                          ['s', '\u2193'], ['S', '\u2193'], ['d', '\u2193']]);
+
+      const heatmap_colors = new Map([[ 1, "#FFFBBE"], [ 2, "#FFF33B"], [3, "#FEDD24"],
+                                      [ 4, "#FDC70C"], [ 5, "#F59824"], [6, "#ED683C"],
+                                      [ 7, "#EB533B"], [ 8, "#E93E3A"], [9, "#D26363"],
+                                      [10, "#BB888B"], [11, "#A4ADB4"]])
+
+
+      var g_map                        = null;        // The global map
+      var annotation                   = null;        // Annotations for the global map
+      var cells                        = null;        // The cells in the display
+      var cell_type_to_color           = null;        // Partiton Cell Type -> Empty Cell Color
+      var cell_type_to_occupied_color  = null;        // Partiton Cell Type -> Full Cell Color
+
+      var gmap_f           = "tmp/vis_gmap.json";    // The global map file
+      var agents_f         = "tmp/vis_agents.json";  // The agents file
+
+      // Get updated warehouse state from simulator
+      var request         = new XMLHttpRequest();
+      var req_returned    = true;
+
+      request.onload = function() {
+
+        if (this.readyState == 4) {
+          req_returned         = true;
+
+          if(this.status == 200) {
+            //console.log(this.responseText);
+            response           = JSON.parse(this.responseText);
+            console.log(response);
+            
+            // If response contains map, response is vis_gmap. If gmap has not
+            // already been received, save gmap, build table.
+            if ("g_map" in response && cells == null) {
+              g_map                        = response.g_map;
+              annotation                   = response.annotation;
+              cell_type_to_color           = new Map(Object.entries(response.vtype_to_p_id));
+              outlets                      = response.outlets;
+              inlets                       = response.inlets;
+
+              nrows                        = g_map.length;
+              ncols                        = g_map[0].length;
+
+              console.log(nrows, ncols)
+              console.log("here1")
+              cells                        = build_table(nrows, ncols);
+              console.log("here2")
+              console.log(cells)
+
+              build_cell_type_to_occupied_color(cell_type_to_color);
+
+              draw_map(g_map, annotation, cells);
+
+            // If response contains agents, response is vis_agents. Update display
+            // with new shard system state.
+            } else if ("col_v" in response) {
+              update_display(g_map, annotation, cells, response);
+
+            // If reponse contains v_to_heat, response is heatmap.
+            } else if ("v_to_heat" in response) {
+              display_heatmap(g_map, annotation, cells, response);
+            }
+          } 
+        }
+      };
+
+      request.onerror = function(e) {
+        req_returned  = true;
+      }
+
+      // If we haven't loaded the workspace map yet (wmap == null), request 
+      // vis_map.json, get the map's dimensions, and build the display table.
+      // Otherwise, request vis_agents.json and update the display table with
+      // the workspace's current state.
+      setInterval(function(){
+        var target_file = (g_map == null ? gmap_f : agents_f);
+        if(req_returned){
+          request.open('GET', target_file, true); //true makes request async
+          req_returned  = false; 
+          request.send();
+        }
+      }, 50); // rate limit here (timer in milliseconds)
+
+    </script>
+</html>
